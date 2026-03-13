@@ -4,8 +4,10 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "strict": true,
-    "noEmit": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "paths": {
+      "solid-js": ["./types/solid-js/index.d.ts"]
+    }
   },
   "include": ["examples/**/*.ts"]
 }
