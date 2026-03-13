@@ -1,2 +1,3 @@
 bin/* filter=lfs diff=lfs merge=lfs -text
 bin/* -diff
+*.vsix filter=lfs diff=lfs merge=lfs -text
