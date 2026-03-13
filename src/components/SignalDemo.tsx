@@ -129,7 +129,7 @@ if (name() !== null && age() !== null) {
         </p>
         <div class="demo-row">
           <span>count():</span>
-          <span class="value">{count() !== undefined ? count() : "undefined"}</span>
+          <span class="value">{count() !== undefined ? count().toFixed(2) : "undefined"}</span>
         </div>
         <div class="code-block">
 {`if (count() !== undefined) {
