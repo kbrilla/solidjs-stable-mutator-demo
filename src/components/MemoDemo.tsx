@@ -11,6 +11,15 @@ interface User {
   active: boolean;
 }
 
+interface ApiUser {
+  name: string;
+  email: string;
+}
+
+type ApiResponse =
+  | { ok: true; data: { users: ApiUser[]; total: number } }
+  | { ok: false; error: { code: number; message: string } };
+
 export default function MemoDemo() {
   // Basic memo
   const [count, setCount] = createSignal(0);
@@ -47,6 +56,30 @@ export default function MemoDemo() {
   ]);
   const activeUsers = createMemo(() => users().filter((u) => u.active));
   const activeCount = createMemo(() => activeUsers().length);
+
+  // typeof guard memo — returns string | number | boolean based on count
+  const mixedMemo = createMemo<string | number | boolean>(() => {
+    if (count() > 10) return "big";
+    if (count() < 0) return false;
+    return count();
+  });
+
+  // Memo chain with API response — progressive narrowing
+  const [rawResponse, setRawResponse] = createSignal<ApiResponse | null>(null);
+  const apiResponse = createMemo(() => rawResponse());
+  const responseData = createMemo(() => {
+    const r = apiResponse();
+    if (r !== null && r.ok) return r.data;
+    return null;
+  });
+  const userNames = createMemo(() => {
+    const d = responseData();
+    return d !== null ? d.users.map(u => u.name) : [];
+  });
+
+  // instanceof narrowing demo
+  const [resultVal, setResultVal] = createSignal<Error | string>("ok");
+  const resultMemo = createMemo(() => resultVal());
 
   return (
     <>
@@ -187,6 +220,176 @@ const activeCount = createMemo(() => activeUsers().length);
 // activeUsers() is stable - the filtered array stays narrowed
 const first = activeUsers()[0];
 if (first) first.name.toUpperCase();  // OK`}
+        </div>
+      </div>
+
+      <div class="demo-section">
+        <h3>typeof Guard Chain on Memo</h3>
+        <p class="subtitle" style={{ "margin-bottom": "0.75rem" }}>
+          typeof narrowing on <span class="badge stable">stable</span> memo — chains through string / number / boolean
+        </p>
+        <div class="demo-row">
+          <span>count():</span>
+          <span class="value">{count()}</span>
+          <span>mixedMemo():</span>
+          <span class="value">{String(mixedMemo())}</span>
+          <span class="type-info">typeof: {typeof mixedMemo()}</span>
+        </div>
+        <div class="demo-row">
+          <Show when={typeof mixedMemo() === "string"}>
+            <span class="narrowing-status narrowed">
+              string → .toUpperCase() = "{(mixedMemo() as string).toUpperCase()}"
+            </span>
+          </Show>
+          <Show when={typeof mixedMemo() === "number"}>
+            <span class="narrowing-status narrowed">
+              number → .toFixed(2) = {(mixedMemo() as number).toFixed(2)}
+            </span>
+          </Show>
+          <Show when={typeof mixedMemo() === "boolean"}>
+            <span class="narrowing-status narrowed">
+              boolean → !val = {String(!(mixedMemo() as boolean))}
+            </span>
+          </Show>
+        </div>
+        <div class="demo-row">
+          <span class="type-info">count &gt; 10 → "big" | count &lt; 0 → false | else → count</span>
+        </div>
+        <div class="demo-row">
+          <button onClick={() => setCount(15)}>Set count = 15 (→ "big")</button>
+          <button onClick={() => setCount(-5)}>Set count = -5 (→ false)</button>
+          <button onClick={() => setCount(7)}>Set count = 7 (→ 7)</button>
+        </div>
+        <div class="code-block">
+{`// typeof narrowing chain on stable memo:
+const mixedMemo = createMemo<string | number | boolean>(() => ...);
+
+if (typeof mixedMemo() === "string") {
+  mixedMemo().toUpperCase();  // OK - narrowed to string
+  mixedMemo().charAt(0);      // OK - still string
+}
+if (typeof mixedMemo() === "number") {
+  mixedMemo().toFixed(2);     // OK - narrowed to number
+  mixedMemo() + 1;            // OK - still number
+}
+if (typeof mixedMemo() === "boolean") {
+  !mixedMemo();               // OK - narrowed to boolean
+}`}
+        </div>
+      </div>
+
+      <div class="demo-section">
+        <h3>Memo Chain with Progressive Narrowing</h3>
+        <p class="subtitle" style={{ "margin-bottom": "0.75rem" }}>
+          Chain of <span class="badge stable">stable</span> memos — each level narrows the previous result
+        </p>
+        <div class="demo-row">
+          <span>apiResponse():</span>
+          <span class="value">
+            {apiResponse() === null ? "null" : (apiResponse() as ApiResponse).ok ? "ok: true" : "ok: false"}
+          </span>
+        </div>
+        <div class="demo-row">
+          <span>responseData():</span>
+          <span class="value">
+            {responseData() !== null
+              ? `{ users: [${responseData()!.users.map(u => u.name).join(", ")}], total: ${responseData()!.total} }`
+              : "null"}
+          </span>
+        </div>
+        <div class="demo-row">
+          <span>userNames():</span>
+          <span class="value">{userNames().length > 0 ? `[${userNames().join(", ")}]` : "[]"}</span>
+          <Show when={responseData() !== null}>
+            <span class="narrowing-status narrowed">chain narrowed through 3 memos</span>
+          </Show>
+          <Show when={responseData() === null}>
+            <span class="narrowing-status not-narrowed">no data yet</span>
+          </Show>
+        </div>
+        <div class="demo-row">
+          <button onClick={() => setRawResponse({
+            ok: true,
+            data: {
+              users: [
+                { name: "Alice", email: "alice@example.com" },
+                { name: "Bob", email: "bob@example.com" },
+              ],
+              total: 2,
+            },
+          })} class="success">
+            Set Success Response
+          </button>
+          <button onClick={() => setRawResponse({
+            ok: false,
+            error: { code: 404, message: "Not Found" },
+          })} class="danger">
+            Set Error Response
+          </button>
+          <button onClick={() => setRawResponse(null)}>Set Null</button>
+        </div>
+        <div class="code-block">
+{`// Progressive narrowing through memo chain:
+type ApiResponse =
+  | { ok: true; data: { users: ApiUser[]; total: number } }
+  | { ok: false; error: { code: number; message: string } };
+
+const response = createMemo(() => rawResponse());
+const responseData = createMemo(() => {
+  const r = response();
+  if (r !== null && r.ok) return r.data;  // narrowed via stable
+  return null;
+});
+const userNames = createMemo(() => {
+  const d = responseData();
+  return d !== null ? d.users.map(u => u.name) : [];  // narrowed
+});
+// Each memo narrows further — all stable, all narrowable`}
+        </div>
+      </div>
+
+      <div class="demo-section">
+        <h3>instanceof Narrowing on Memo</h3>
+        <p class="subtitle" style={{ "margin-bottom": "0.75rem" }}>
+          instanceof checks narrow <span class="badge stable">stable</span> memos to class instances
+        </p>
+        <div class="demo-row">
+          <span>resultMemo():</span>
+          <span class="value">
+            {resultMemo() instanceof Error
+              ? `Error: ${(resultMemo() as Error).message}`
+              : String(resultMemo())}
+          </span>
+          <Show when={resultMemo() instanceof Error}>
+            <span class="narrowing-status narrowed">
+              narrowed to Error — .message, .stack available
+            </span>
+          </Show>
+          <Show when={!(resultMemo() instanceof Error)}>
+            <span class="narrowing-status not-narrowed">string — no Error properties</span>
+          </Show>
+        </div>
+        <div class="demo-row">
+          <button onClick={() => setResultVal("everything is fine")} class="success">Set String</button>
+          <button onClick={() => setResultVal(new Error("Something went wrong"))} class="danger">
+            Set Error
+          </button>
+          <button onClick={() => setResultVal(new Error("Network timeout"))}>
+            Set Network Error
+          </button>
+        </div>
+        <div class="code-block">
+{`// instanceof narrowing persists on stable memo:
+const resultMemo = createMemo(() => result());
+
+if (resultMemo() instanceof Error) {
+  resultMemo().message;  // OK - narrowed to Error
+  resultMemo().stack;    // OK - still Error
+  resultMemo().name;     // OK - still Error
+} else {
+  resultMemo().toUpperCase();  // OK - narrowed to string
+  resultMemo().length;         // OK - still string
+}`}
         </div>
       </div>
     </>

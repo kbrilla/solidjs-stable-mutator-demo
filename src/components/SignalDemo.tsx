@@ -16,6 +16,21 @@ export default function SignalDemo() {
   const [name, setName] = createSignal<string | null>("Alice");
   const [age, setAge] = createSignal<number | null>(30);
 
+  // typeof guard demo
+  const [input, setInput] = createSignal<string | number>("hello");
+
+  // Array signal for null guard + method chain demo
+  const [items, setItems] = createSignal<string[] | null>(["apple", "banana", "cherry"]);
+
+  // Exhaustive switch using stable signal
+  function getStatusMessage(): string {
+    switch (state().status) {
+      case "loading": return "Loading...";
+      case "success": return state().data;
+      case "error": return state().message;
+    }
+  }
+
   return (
     <>
       <h2>Signal Narrowing</h2>
@@ -142,6 +157,125 @@ if (name() !== null && age() !== null) {
   // Post-call narrowing: narrowed to undefined
   const b: undefined = count();   // OK - re-narrowed
 }`}
+        </div>
+      </div>
+
+      <div class="demo-section">
+        <h3>typeof Guard Narrowing</h3>
+        <p class="subtitle" style={{ "margin-bottom": "0.75rem" }}>
+          typeof checks narrow <span class="badge stable">stable</span> accessors across repeated calls
+        </p>
+        <div class="demo-row">
+          <span>input():</span>
+          <span class="value">{String(input())}</span>
+          <span class="type-info">typeof: {typeof input()}</span>
+        </div>
+        <div class="demo-row">
+          <Show when={typeof input() === "string"}>
+            <span class="narrowing-status narrowed">
+              string → .toUpperCase() = "{(input() as string).toUpperCase()}"
+            </span>
+          </Show>
+          <Show when={typeof input() === "number"}>
+            <span class="narrowing-status narrowed">
+              number → .toFixed(2) = {(input() as number).toFixed(2)}
+            </span>
+          </Show>
+        </div>
+        <div class="demo-row">
+          <button onClick={() => setInput("hello")}>Set "hello"</button>
+          <button onClick={() => setInput(42)}>Set 42</button>
+          <button onClick={() => setInput("TypeScript-Go")}>Set "TypeScript-Go"</button>
+          <button onClick={() => setInput(3.14159)}>Set π</button>
+        </div>
+        <div class="code-block">
+{`// typeof narrowing persists across multiple stable calls:
+const [input, setInput] = createSignal<string | number>("hello");
+
+if (typeof input() === "string") {
+  input().toUpperCase();  // OK - narrowed to string
+  input().charAt(0);      // OK - still string
+  input().length;          // OK - still string
+}
+if (typeof input() === "number") {
+  input().toFixed(2);     // OK - narrowed to number
+  input() * 2;            // OK - still number
+  Math.round(input());    // OK - still number
+}
+// Without stable, only the FIRST input() after the guard is narrowed`}
+        </div>
+      </div>
+
+      <div class="demo-section">
+        <h3>Exhaustive Switch on Signal</h3>
+        <p class="subtitle" style={{ "margin-bottom": "0.75rem" }}>
+          switch on <span class="badge stable">stable</span> discriminated union — each case narrows properties
+        </p>
+        <div class="demo-row">
+          <span>state().status:</span>
+          <span class="value">{state().status}</span>
+          <span>getStatusMessage():</span>
+          <span class="value">{getStatusMessage()}</span>
+        </div>
+        <div class="demo-row">
+          <button onClick={() => setState({ status: "loading" })}>Loading</button>
+          <button onClick={() => setState({ status: "success", data: "Response OK" })} class="success">
+            Success
+          </button>
+          <button onClick={() => setState({ status: "error", message: "Request failed" })} class="danger">
+            Error
+          </button>
+        </div>
+        <div class="code-block">
+{`// Exhaustive switch — each case narrows state() fully:
+function getStatusMessage(): string {
+  switch (state().status) {
+    case "loading":
+      return "Loading...";
+    case "success":
+      return state().data;     // narrowed: { status: "success"; data: string }
+    case "error":
+      return state().message;  // narrowed: { status: "error"; message: string }
+  }
+  // No default needed — exhaustive with stable narrowing
+}`}
+        </div>
+      </div>
+
+      <div class="demo-section">
+        <h3>Null Guard with Method Chains</h3>
+        <p class="subtitle" style={{ "margin-bottom": "0.75rem" }}>
+          Null checks on <span class="badge stable">stable</span> signals persist through chains of method calls
+        </p>
+        <div class="demo-row">
+          <span>items():</span>
+          <span class="value">{items() !== null ? `[${items()!.join(", ")}]` : "null"}</span>
+          <Show when={items() !== null}>
+            <span class="narrowing-status narrowed">
+              narrowed → .length = {items()!.length}, .map/.forEach available
+            </span>
+          </Show>
+          <Show when={items() === null}>
+            <span class="narrowing-status not-narrowed">null — methods unavailable</span>
+          </Show>
+        </div>
+        <div class="demo-row">
+          <button onClick={() => setItems(["apple", "banana", "cherry"])}>Set Array</button>
+          <button onClick={() => setItems(null)} class="danger">Set Null</button>
+          <button onClick={() => setItems(["x", "y", "z", "w", "v"])}>Set 5 Items</button>
+        </div>
+        <div class="code-block">
+{`// Null guard persists across multiple method calls:
+const [items, setItems] = createSignal<string[] | null>(["apple", "banana"]);
+
+if (items() !== null) {
+  items().length;                    // OK - narrowed to string[]
+  items().map(x => x.toUpperCase()); // OK - still narrowed
+  items().forEach(x => log(x));      // OK - still narrowed
+  items().filter(x => x.length > 3); // OK - still narrowed
+  items().join(", ");                 // OK - still narrowed
+}
+// Without stable, only the FIRST items() would be narrowed`}
         </div>
       </div>
     </>
