@@ -4,10 +4,12 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "strict": true,
+    "jsx": "preserve",
+    "jsxImportSource": "solid-js",
+    "noEmit": true,
     "skipLibCheck": true,
-    "paths": {
-      "solid-js": ["./types/solid-js/index.d.ts"]
-    }
+    "isolatedModules": true,
+    "allowImportingTsExtensions": true
   },
-  "include": ["examples/**/*.ts"]
+  "include": ["src/**/*.ts", "src/**/*.tsx"]
 }
